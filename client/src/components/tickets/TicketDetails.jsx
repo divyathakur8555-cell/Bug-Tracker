@@ -1,0 +1,1 @@
+export default function TicketDetails({ticket}){return ticket?<div className="card"><h2>{ticket.title}</h2><p>{ticket.description}</p><p className="muted">{ticket.status} · {ticket.priority}</p></div>:null;}

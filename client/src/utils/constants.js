@@ -1,0 +1,1 @@
+export const TICKET_STATUSES=["Todo","In Progress","Done"]; export const PRIORITIES=["Low","Medium","High"]; export const API_URL=import.meta.env.VITE_API_URL||"http://localhost:5000/api";
