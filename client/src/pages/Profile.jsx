@@ -1,36 +1,22 @@
 
-import { useEffect, useState } from "react";
-import {
-  UserRound,
-  Settings,
-  ShieldCheck,
-  AlertTriangle,
-  Save,
-  Lock,
-  Trash2,
-  Users,
-  ArrowRightLeft,
-} from "lucide-react";
-
-import { useAuthContext } from "../context/AuthContext";
+import { useState } from "react";
+import useAuth from "../hooks/useAuth";
 
 export default function Profile() {
-  const { user, logout } = useAuthContext();
-
-  const API_URL =
-    import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const { user, logout } = useAuth();
 
   const [name, setName] = useState(user?.name || "");
-  const [theme, setTheme] = useState(
-    localStorage.getItem("trackwise_theme") || "light"
-  );
+  const [theme, setTheme] = useState("Light");
   const [notifications, setNotifications] = useState(true);
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // Change password states
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  // Security states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -38,51 +24,9 @@ export default function Profile() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
-  // Account deletion states
-  const [projects, setProjects] = useState([]);
-  const [projectActions, setProjectActions] = useState({});
-  const [loadingProjects, setLoadingProjects] = useState(true);
-  const [projectsError, setProjectsError] = useState("");
-  const [deletePassword, setDeletePassword] = useState("");
-  const [deletingAccount, setDeletingAccount] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
-
-  // Load projects owned by the current user
-  useEffect(() => {
-    const loadOwnedProjects = async () => {
-      try {
-        setLoadingProjects(true);
-        setProjectsError("");
-
-        const token = localStorage.getItem("trackwise_token");
-
-        const response = await fetch(`${API_URL}/auth/owned-projects`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to load your projects.");
-        }
-
-        setProjects(data.projects || []);
-      } catch (err) {
-        setProjectsError(err.message);
-      } finally {
-        setLoadingProjects(false);
-      }
-    };
-
-    loadOwnedProjects();
-  }, [API_URL]);
-
-  // Save profile
+  // UPDATE PROFILE
   const handleSave = async (e) => {
     e.preventDefault();
-
     setSaving(true);
     setMessage("");
     setError("");
@@ -90,19 +34,22 @@ export default function Profile() {
     try {
       const token = localStorage.getItem("trackwise_token");
 
-      const response = await fetch(`${API_URL}/auth/profile`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ name }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/auth/profile",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Unable to update profile.");
+        throw new Error(data.message || "Unable to update profile");
       }
 
       setMessage("Profile updated successfully.");
@@ -113,20 +60,22 @@ export default function Profile() {
     }
   };
 
-  // Change password
+  // CHANGE PASSWORD
   const handleChangePassword = async (e) => {
     e.preventDefault();
 
     setPasswordMessage("");
     setPasswordError("");
 
-    if (newPassword !== confirmPassword) {
-      setPasswordError("New passwords do not match.");
+    if (newPassword.length < 8) {
+      setPasswordError(
+        "New password must contain at least 8 characters."
+      );
       return;
     }
 
-    if (newPassword.length < 8) {
-      setPasswordError("Password must contain at least 8 characters.");
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match.");
       return;
     }
 
@@ -135,34 +84,35 @@ export default function Profile() {
     try {
       const token = localStorage.getItem("trackwise_token");
 
-      const response = await fetch(`${API_URL}/auth/change-password`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          currentPassword,
-          newPassword,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/auth/change-password",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            currentPassword,
+            newPassword,
+            confirmPassword,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Password update failed.");
+        throw new Error(
+          data.message || "Password change failed."
+        );
       }
 
-      setPasswordMessage("Password changed. Logging you out...");
+      setPasswordMessage(data.message);
 
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-
-      setTimeout(() => {
-        logout();
-        window.location.href = "/login";
-      }, 1500);
     } catch (err) {
       setPasswordError(err.message);
     } finally {
@@ -170,156 +120,108 @@ export default function Profile() {
     }
   };
 
-  // Theme
-  const handleThemeChange = (newTheme) => {
-    setTheme(newTheme);
-
-    localStorage.setItem("trackwise_theme", newTheme);
-
-    document.documentElement.setAttribute("data-theme", newTheme);
-
-    window.dispatchEvent(new Event("trackwise-theme-change"));
-  };
-
-  // Deactivate account
+  // DEACTIVATE ACCOUNT
   const handleDeactivate = async () => {
-    const confirmed = window.confirm(
-      "Are you sure you want to deactivate your account?"
-    );
-
-    if (!confirmed) return;
+    if (
+      !window.confirm(
+        "Are you sure you want to deactivate your account?"
+      )
+    ) {
+      return;
+    }
 
     try {
       const token = localStorage.getItem("trackwise_token");
 
-      const response = await fetch(`${API_URL}/auth/deactivate`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/auth/deactivate",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Account deactivation failed.");
+        throw new Error(data.message || "Deactivation failed");
       }
 
       logout();
       window.location.href = "/login";
     } catch (err) {
-      setError(err.message);
+      alert(err.message);
     }
   };
 
-  // Select delete or transfer for a project
-  const handleProjectAction = (projectId, action) => {
-    setProjectActions((previous) => ({
-      ...previous,
-      [projectId]: {
-        action,
-        newOwner: "",
-      },
-    }));
-  };
-
-  // Select a new project owner
-  const handleNewOwner = (projectId, newOwner) => {
-    setProjectActions((previous) => ({
-      ...previous,
-      [projectId]: {
-        ...previous[projectId],
-        newOwner,
-      },
-    }));
-  };
-
-  // Permanently delete account
+  // DELETE ACCOUNT
   const handleDeleteAccount = async (e) => {
     e.preventDefault();
 
-    setDeleteError("");
-
     if (!deletePassword) {
-      setDeleteError("Please enter your current password.");
-      return;
-    }
-
-    const incompleteProject = projects.find((project) => {
-      const choice = projectActions[project._id];
-
-      return (
-        !choice?.action ||
-        (choice.action === "transfer" && !choice.newOwner)
-      );
-    });
-
-    if (incompleteProject) {
-      setDeleteError(
-        `Please choose whether to delete or transfer "${incompleteProject.title}".`
-      );
+      alert("Please enter your current password.");
       return;
     }
 
     const confirmed = window.confirm(
-      "This action is permanent. Your account will be deleted and cannot be recovered. Continue?"
+      "Are you sure you want to schedule your account for deletion? You can recover it within 30 days by logging in again."
     );
 
     if (!confirmed) return;
 
-    setDeletingAccount(true);
+    setDeleting(true);
 
     try {
       const token = localStorage.getItem("trackwise_token");
 
-      const actions = projects.map((project) => ({
-        projectId: project._id,
-        action: projectActions[project._id].action,
-        ...(projectActions[project._id].action === "transfer"
-          ? { newOwner: projectActions[project._id].newOwner }
-          : {}),
-      }));
-
-      const response = await fetch(`${API_URL}/auth/delete-account`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          password: deletePassword,
-          projectActions: actions,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:5000/api/auth/account",
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            password: deletePassword,
+          }),
+        }
+      );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || "Account deletion failed.");
+        throw new Error(
+          data.message || "Account deletion failed."
+        );
       }
 
-      window.alert("Your account has been permanently deleted.");
+      alert(data.message);
 
       logout();
       window.location.href = "/login";
     } catch (err) {
-      setDeleteError(err.message);
+      alert(err.message);
     } finally {
-      setDeletingAccount(false);
+      setDeleting(false);
     }
   };
 
-  const displayName = name.trim() || "Your Name";
-
   return (
     <div className="settings-page">
-
-      {/* Header */}
       <div className="settings-header">
         <div>
-          <span className="settings-eyebrow">ACCOUNT MANAGEMENT</span>
+          <span className="settings-eyebrow">
+            ACCOUNT MANAGEMENT
+          </span>
+
           <h1>Profile Settings</h1>
-          <p>Manage your personal information and preferences.</p>
+
+          <p>
+            Manage your personal information and preferences.
+          </p>
         </div>
 
         <div className="profile-status">
@@ -328,26 +230,24 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* Profile banner */}
+      {/* PROFILE BANNER */}
       <div className="settings-profile-banner">
         <div className="settings-avatar">
-          {displayName.charAt(0).toUpperCase()}
+          {name.charAt(0).toUpperCase() || "U"}
         </div>
 
         <div className="settings-user-info">
-          <h2>{displayName}</h2>
+          <h2>{name || "Your Name"}</h2>
           <p>{user?.email || "No email available"}</p>
           <span>Trackwise Member</span>
         </div>
       </div>
 
-      {/* Personal information */}
+      {/* PERSONAL INFORMATION */}
       <form onSubmit={handleSave}>
         <section className="settings-section">
           <div className="settings-section-heading">
-            <div className="settings-icon">
-              <UserRound size={20} />
-            </div>
+            <div className="settings-icon">♙</div>
 
             <div>
               <h2>Personal Information</h2>
@@ -358,6 +258,7 @@ export default function Profile() {
           <div className="settings-form-grid">
             <div className="settings-field">
               <label>Full Name</label>
+
               <input
                 type="text"
                 value={name}
@@ -369,8 +270,14 @@ export default function Profile() {
 
             <div className="settings-field">
               <label>Email Address</label>
-              <input type="email" value={user?.email || ""} disabled />
-              <small>Email editing is not available yet.</small>
+
+              <input
+                type="email"
+                value={user?.email || ""}
+                disabled
+              />
+
+              
             </div>
           </div>
 
@@ -380,22 +287,24 @@ export default function Profile() {
               className="settings-primary-btn"
               disabled={saving}
             >
-              <Save size={17} />
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
 
-          {message && <p className="settings-message">{message}</p>}
-          {error && <p className="settings-error">{error}</p>}
+          {message && (
+            <p className="settings-message">{message}</p>
+          )}
+
+          {error && (
+            <p className="settings-error">{error}</p>
+          )}
         </section>
       </form>
 
-      {/* Personalization */}
+      {/* PERSONALIZATION */}
       <section className="settings-section">
         <div className="settings-section-heading">
-          <div className="settings-icon">
-            <Settings size={20} />
-          </div>
+          <div className="settings-icon">⚙</div>
 
           <div>
             <h2>Personalization</h2>
@@ -411,36 +320,40 @@ export default function Profile() {
 
           <select
             value={theme}
-            onChange={(e) => handleThemeChange(e.target.value)}
+            onChange={(e) => setTheme(e.target.value)}
           >
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
+            <option>Light</option>
+            <option>Dark</option>
+            <option>System Default</option>
           </select>
         </div>
 
         <div className="settings-option">
           <div>
             <strong>Email Notifications</strong>
-            <p>Receive updates about projects and tickets.</p>
+            <p>
+              Receive updates about projects and tickets.
+            </p>
           </div>
 
           <label className="settings-switch">
             <input
               type="checkbox"
               checked={notifications}
-              onChange={(e) => setNotifications(e.target.checked)}
+              onChange={(e) =>
+                setNotifications(e.target.checked)
+              }
             />
+
             <span></span>
           </label>
         </div>
       </section>
 
-      {/* Security */}
+      {/* SECURITY */}
       <section className="settings-section">
         <div className="settings-section-heading">
-          <div className="settings-icon">
-            <ShieldCheck size={20} />
-          </div>
+          <div className="settings-icon">♢</div>
 
           <div>
             <h2>Security</h2>
@@ -448,24 +361,22 @@ export default function Profile() {
           </div>
         </div>
 
-        <div className="settings-option">
-          <div>
-            <strong>Change Password</strong>
-            <p>Update your password to protect your account.</p>
-          </div>
-          <Lock size={20} />
-        </div>
-
         <form
           onSubmit={handleChangePassword}
           className="settings-password-form"
         >
           <div className="settings-field">
-            <label>Current Password</label>
+            <label htmlFor="current-password">
+              Current Password
+            </label>
+
             <input
+              id="current-password"
               type="password"
               value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
+              onChange={(e) =>
+                setCurrentPassword(e.target.value)
+              }
               placeholder="Enter current password"
               autoComplete="current-password"
               required
@@ -473,67 +384,85 @@ export default function Profile() {
           </div>
 
           <div className="settings-field">
-            <label>New Password</label>
+            <label htmlFor="new-password">
+              New Password
+            </label>
+
             <input
+              id="new-password"
               type="password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={(e) =>
+                setNewPassword(e.target.value)
+              }
               placeholder="Minimum 8 characters"
-              minLength={8}
               autoComplete="new-password"
+              minLength={8}
               required
             />
           </div>
 
           <div className="settings-field">
-            <label>Confirm New Password</label>
+            <label htmlFor="confirm-password">
+              Confirm New Password
+            </label>
+
             <input
+              id="confirm-password"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm your new password"
-              minLength={8}
+              onChange={(e) =>
+                setConfirmPassword(e.target.value)
+              }
+              placeholder="Enter new password again"
               autoComplete="new-password"
+              minLength={8}
               required
             />
           </div>
+
+          {passwordError && (
+            <p className="settings-error" role="alert">
+              {passwordError}
+            </p>
+          )}
+
+          {passwordMessage && (
+            <p className="settings-message" role="status">
+              {passwordMessage}
+            </p>
+          )}
 
           <button
             type="submit"
             className="settings-primary-btn"
             disabled={changingPassword}
           >
-            <Lock size={17} />
-            {changingPassword ? "Updating..." : "Update Password"}
+            {changingPassword
+              ? "Updating..."
+              : "Update Password"}
           </button>
-
-          {passwordMessage && (
-            <p className="settings-message">{passwordMessage}</p>
-          )}
-
-          {passwordError && (
-            <p className="settings-error">{passwordError}</p>
-          )}
         </form>
       </section>
 
-      {/* Deactivate account */}
-      <section className="settings-section">
+      {/* ACCOUNT MANAGEMENT */}
+      <section className="settings-section settings-danger">
         <div className="settings-section-heading">
-          <div className="settings-icon">
-            <AlertTriangle size={20} />
-          </div>
+          <div className="settings-icon danger-icon">!</div>
 
           <div>
-            <h2>Deactivate Account</h2>
-            <p>Temporarily disable your account.</p>
+            <h2>Account Management</h2>
+            <p>Manage the status of your account.</p>
           </div>
         </div>
 
+        {/* DEACTIVATE */}
         <div className="settings-option">
           <div>
             <strong>Deactivate Account</strong>
+
             <p>
+              Temporarily disable your account.
               Your projects and tickets will remain saved.
             </p>
           </div>
@@ -546,173 +475,50 @@ export default function Profile() {
             Deactivate Account
           </button>
         </div>
-      </section>
 
-      {/* Permanent account deletion */}
-      <section className="settings-section settings-danger">
-        <div className="settings-section-heading">
-          <div className="settings-icon danger-icon">
-            <Trash2 size={20} />
-          </div>
-
-          <div>
-            <h2>Permanently Delete Account</h2>
-            <p>
-              This action cannot be undone. Review your projects before
-              continuing.
-            </p>
-          </div>
-        </div>
-
+        {/* DELETE */}
         <div className="settings-option">
           <div>
-            <strong>Your owned projects</strong>
+            <strong>Delete Account Permanently</strong>
+
             <p>
-              Choose what happens to each project before deleting your
-              account.
+              Schedule your account for permanent deletion.
+              You have 30 days to recover it by logging in again.
             </p>
           </div>
-
-          <Users size={21} />
         </div>
 
-        {loadingProjects && (
-          <p>Loading your projects...</p>
-        )}
-
-        {projectsError && (
-          <p className="settings-error">{projectsError}</p>
-        )}
-
-        {!loadingProjects && !projectsError && projects.length === 0 && (
-          <p className="settings-message">
-            You don't own any projects. You can proceed with account deletion.
-          </p>
-        )}
-
-        {!loadingProjects && projects.map((project) => {
-          const choice = projectActions[project._id] || {};
-          const members = project.teamMembers || [];
-
-          return (
-            <div
-              key={project._id}
-              className="settings-project-delete-card"
-            >
-              <h3>{project.title}</h3>
-
-              <p>
-                {project.description || "No project description."}
-              </p>
-
-              <div className="settings-field">
-                <label>What should happen to this project?</label>
-
-                <select
-                  value={choice.action || ""}
-                  onChange={(e) =>
-                    handleProjectAction(project._id, e.target.value)
-                  }
-                >
-                  <option value="">Choose an action</option>
-                  <option value="delete">Permanently delete project</option>
-                  <option value="transfer">Transfer project ownership</option>
-                </select>
-              </div>
-
-              {choice.action === "delete" && (
-                <p className="settings-error">
-                  This project and all its tickets will be permanently deleted.
-                  Other team members will lose access.
-                </p>
-              )}
-
-              {choice.action === "transfer" && (
-                <div className="settings-field">
-                  <label>
-                    <ArrowRightLeft size={16} /> Select an existing team member
-                  </label>
-
-                  {members.length === 0 ? (
-                    <p className="settings-error">
-                      This project has no team members to transfer ownership to.
-                      Choose permanent deletion instead.
-                    </p>
-                  ) : (
-                    <select
-                      value={choice.newOwner || ""}
-                      onChange={(e) =>
-                        handleNewOwner(project._id, e.target.value)
-                      }
-                    >
-                      <option value="">Choose a new owner</option>
-
-                      {members.map((member) => (
-                        <option
-                          key={member._id}
-                          value={member._id}
-                          disabled={!member.isActive}
-                        >
-                          {member.name} ({member.email})
-                          {!member.isActive ? " - Inactive" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  <small>
-                    The selected member will become the project owner.
-                    The project and its tickets will be preserved.
-                  </small>
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        <form onSubmit={handleDeleteAccount}>
+        <form
+          onSubmit={handleDeleteAccount}
+          className="settings-password-form"
+        >
           <div className="settings-field">
-            <label>Confirm Your Current Password</label>
+            <label htmlFor="delete-account-password">
+              Confirm your current password
+            </label>
 
             <input
+              id="delete-account-password"
               type="password"
               value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              placeholder="Enter your password to confirm deletion"
+              onChange={(e) =>
+                setDeletePassword(e.target.value)
+              }
+              placeholder="Enter your current password"
               autoComplete="current-password"
               required
             />
           </div>
 
-          {deleteError && (
-            <p className="settings-error">{deleteError}</p>
-          )}
-
           <button
             type="submit"
             className="settings-danger-btn"
-            disabled={
-              deletingAccount ||
-              loadingProjects ||
-              !!projectsError ||
-              projects.some((project) => {
-                const choice = projectActions[project._id];
-
-                return (
-                  !choice?.action ||
-                  (choice.action === "transfer" && !choice.newOwner)
-                );
-              })
-            }
+            disabled={deleting}
           >
-            <Trash2 size={17} />
-            {deletingAccount
-              ? "Deleting Account..."
-              : "Permanently Delete My Account"}
+            {deleting ? "Processing..." : "Delete Account"}
           </button>
         </form>
       </section>
-
     </div>
   );
 }

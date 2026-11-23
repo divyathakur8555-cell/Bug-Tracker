@@ -9,7 +9,7 @@ import {
 import {
   createProject,
   getProjects,
-  deleteProject as deleteProjectRequest
+  deleteProject
 } from "../services/projectService";
 
 import { useAuthContext } from "./AuthContext";
@@ -33,8 +33,8 @@ export function ProjectProvider({ children }) {
     setLoading(true);
 
     try {
-      const data = await getProjects();
-      setProjects(data.projects || data.data || data || []);
+      const d = await getProjects();
+      setProjects(d.projects || d.data || d || []);
     } finally {
       setLoading(false);
     }
@@ -44,14 +44,14 @@ export function ProjectProvider({ children }) {
     refreshProjects().catch(() => {});
   }, [user]);
 
-  const addProject = async (form) => {
-    const data = await createProject(form);
+  const addProject = async (formData) => {
+    const d = await createProject(formData);
     await refreshProjects();
-    return data;
+    return d;
   };
 
-  const deleteProject = async (id) => {
-    await deleteProjectRequest(id);
+  const removeProject = async (id) => {
+    await deleteProject(id);
     await refreshProjects();
   };
 
@@ -62,7 +62,7 @@ export function ProjectProvider({ children }) {
         loading,
         refreshProjects,
         addProject,
-        deleteProject
+        removeProject
       }}
     >
       {children}

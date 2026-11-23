@@ -10,7 +10,6 @@ const router = Router();
 
 router.use(auth);
 
-// Get all projects belonging to the user or shared with them
 router.get('/', async (req, res, next) => {
   try {
     const projects = await Project.find({
@@ -24,12 +23,11 @@ router.get('/', async (req, res, next) => {
       .sort('-updatedAt');
 
     res.json(projects);
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Create a project
 router.post('/', async (req, res, next) => {
   try {
     if (!req.body.title?.trim()) {
@@ -48,12 +46,11 @@ router.post('/', async (req, res, next) => {
     res.status(201).json(
       await project.populate('teamMembers', 'name email')
     );
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Get one project
 router.get('/:id', async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
@@ -79,12 +76,11 @@ router.get('/:id', async (req, res, next) => {
     }
 
     res.json(project);
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Update a project
 router.patch('/:id', async (req, res, next) => {
   try {
     const project = await Project.findOne({
@@ -109,12 +105,11 @@ router.patch('/:id', async (req, res, next) => {
     await project.save();
 
     res.json(project);
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Add a team member
 router.post('/:id/members', async (req, res, next) => {
   try {
     const project = await Project.findOne({
@@ -147,15 +142,14 @@ router.post('/:id/members', async (req, res, next) => {
     res.json(
       await project.populate('teamMembers', 'name email')
     );
-  } catch (error) {
-    next(error);
+  } catch (e) {
+    next(e);
   }
 });
 
-// Permanently delete a project and its tickets
+// Delete a project and all its tickets.
+// Only the project owner can perform this action.
 router.delete('/:id', async (req, res, next) => {
-  let session;
-
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({
@@ -163,49 +157,28 @@ router.delete('/:id', async (req, res, next) => {
       });
     }
 
-    session = await mongoose.startSession();
-
-    let projectNotFound = false;
-
-    await session.withTransaction(async () => {
-      const project = await Project.findOne({
-        _id: req.params.id,
-        owner: req.user.id
-      }).session(session);
-
-      if (!project) {
-        projectNotFound = true;
-        return;
-      }
-
-      // Delete all tickets belonging to this project
-      await Ticket.deleteMany(
-        { project: project._id },
-        { session }
-      );
-
-      // Delete the project itself
-      await Project.deleteOne(
-        { _id: project._id },
-        { session }
-      );
+    const project = await Project.findOne({
+      _id: req.params.id,
+      owner: req.user.id
     });
 
-    if (projectNotFound) {
+    if (!project) {
       return res.status(404).json({
         message: 'Project not found or you are not the owner'
       });
     }
 
+    await Ticket.deleteMany({
+      project: project._id
+    });
+
+    await project.deleteOne();
+
     res.json({
       message: 'Project and its tickets deleted successfully'
     });
-  } catch (error) {
-    next(error);
-  } finally {
-    if (session) {
-      await session.endSession();
-    }
+  } catch (e) {
+    next(e);
   }
 });
 

@@ -13,242 +13,90 @@ export default function Login() {
   });
 
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
-
     setError("");
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      await login(form);
+      await login({
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+      });
+
       navigate("/dashboard");
     } catch (err) {
-      setError(
-        err.message || "Unable to sign in. Please try again."
-      );
+      setError(err.message || "Login failed. Please try again.");
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="auth-shell">
+    <div className="auth-page">
+      <div className="auth-card">
+        <h1>Trackwise</h1>
 
-      {/* Left decorative section */}
-      <section className="auth-art">
+        <p className="muted">Sign in to your workspace</p>
 
-        <Link to="/" className="brand">
-          <span className="brand-icon">✦</span>
-          Trackwise
-        </Link>
+        <form className="form" onSubmit={submit}>
+          <label htmlFor="login-email">
+            Email address
 
-        <div className="art-copy">
- <span
-  className="eyebrow"
-  style={{
-    color: "#5145cd",
-    fontWeight: "1000",
-    fontSize: "15px",
-    letterSpacing: "2px",
-    textShadow: "0.4px 0 currentColor, -0.4px 0 currentColor",
-  }}
->
-  WELCOME BACK
-</span>
-          <h1>
-            Great work
-            <br />
-            starts with
-            <br />
-            <span style={{ color: "#8b83ff" }}>
-              clear focus.
-            </span>
-          </h1>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              placeholder="Enter your registered email"
+              value={form.email}
+              onChange={(e) =>
+                setForm({ ...form, email: e.target.value })
+              }
+              required
+            />
+          </label>
 
-          <p>
-            Bring your projects, tasks, and team together.
-            Pick up where you left off and keep making progress.
-          </p>
+          <label htmlFor="login-password">
+            Password
 
-          <div className="art-card">
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              value={form.password}
+              onChange={(e) =>
+                setForm({ ...form, password: e.target.value })
+              }
+              required
+            />
+          </label>
 
-            <div className="mini-top">
-              <span>YOUR WORKSPACE</span>
-              <span className="live-dot">● ACTIVE</span>
-            </div>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
 
-            <div
-              style={{
-                margin: "22px 0 8px",
-                color: "#fff",
-                fontSize: "14px",
-              }}
-            >
-              Your next big milestone
-            </div>
-
-            <div className="mini-bars">
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-
-            <div className="mini-bottom">
-              <b>Keep moving forward</b>
-              <span>One task at a time</span>
-            </div>
-
-          </div>
-        </div>
-
-        <p className="art-foot">
-          PLAN · TRACK · ACCOMPLISH
-        </p>
-
-      </section>
-
-      {/* Right login form */}
-      <section className="auth-form-wrap">
-
-        <div className="auth-form">
-
-          <span className="eyebrow">
-            YOUR WORKSPACE AWAITS
-          </span>
-
-         <h2
-  style={{
-    fontWeight: 900,
-    color: "#4B267D",
-    WebkitTextFillColor: "#4B267D",
-    WebkitTextStroke: "0.5px #4B267D",
-    opacity: 1,
-  }}
->
-  Welcome back
-</h2>
-
-          <p className="muted">
-            Sign in to continue to your Trackwise account.
-          </p>
-
-          <form onSubmit={submit}>
-
-            {/* Email */}
-            <label htmlFor="login-email">
-              Email address
-
-              <input
-                id="login-email"
-                type="email"
-                placeholder="you@example.com"
-                autoComplete="email"
-                required
-                value={form.email}
-                onChange={(e) =>
-                  setForm((prev) => ({
-                    ...prev,
-                    email: e.target.value,
-                  }))
-                }
-              />
-            </label>
-
-            {/* Password */}
-            <label htmlFor="login-password">
-              Password
-
-              <div style={{ position: "relative" }}>
-
-                <input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  required
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      password: e.target.value,
-                    }))
-                  }
-                  style={{ paddingRight: "75px" }}
-                />
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowPassword((prev) => !prev)
-                  }
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    border: "none",
-                    background: "transparent",
-                    color: "#6558e8",
-                    fontSize: "12px",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                  }}
-                >
-                  {showPassword ? "Hide" : "Show"}
-                </button>
-
-              </div>
-            </label>
-
-            {/* Error message */}
-            {error && (
-              <p className="error" role="alert">
-                {error}
-              </p>
-            )}
-
-            {/* Submit */}
-            <button
-              className="primary full"
-              type="submit"
-              disabled={loading}
-            >
-              {loading
-                ? "Signing in..."
-                : "Sign in to Trackwise →"}
-            </button>
-
-          </form>
-
-          <p className="switch-auth">
-            Don't have an account?{" "}
-            <Link to="/register">
-              Create an account
-            </Link>
-          </p>
-
-          <p
-            className="muted"
-            style={{
-              textAlign: "center",
-              marginTop: "45px",
-            }}
+          <button
+            className="btn"
+            type="submit"
+            disabled={submitting}
           >
-            © {new Date().getFullYear()} Trackwise.
-            All rights reserved.
-          </p>
+            {submitting ? "Signing in..." : "Login"}
+          </button>
+        </form>
 
-        </div>
-
-      </section>
-
+        <p className="muted">
+          New user? <Link to="/register">Create account</Link>
+        </p>
+      </div>
     </div>
   );
 }

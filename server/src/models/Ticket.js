@@ -6,13 +6,13 @@ const commentSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null
     },
     text: {
       type: String,
       required: true,
-      trim: true,
-    },
+      trim: true
+    }
   },
   { timestamps: true }
 );
@@ -22,47 +22,40 @@ const ticketSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
-      trim: true,
+      trim: true
     },
-
     description: {
       type: String,
       default: "",
-      trim: true,
+      trim: true
     },
-
     project: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Project",
-      required: true,
+      required: true
     },
-
     priority: {
       type: String,
-      default: "Medium",
+      default: "Medium"
     },
-
     status: {
       type: String,
-      default: "Open",
+      default: "Open"
     },
-
     assignee: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      default: null,
+      default: null
     },
-
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      default: null
     },
-
-    comments: [commentSchema],
+    comments: [commentSchema]
   },
   {
-    timestamps: true,
+    timestamps: true
   }
 );
 

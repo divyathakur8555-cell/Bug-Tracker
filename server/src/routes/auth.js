@@ -2,7 +2,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-
 import User from '../models/User.js';
 import Project from '../models/Project.js';
 import Ticket from '../models/Ticket.js';
@@ -10,17 +9,62 @@ import auth from '../middleware/auth.js';
 
 const router = Router();
 
-const tokenFor = (id) => {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is not configured');
-  }
+const RECOVERY_DAYS = 30;
 
-  return jwt.sign(
+const tokenFor = (id) =>
+  jwt.sign(
     { id },
-    process.env.JWT_SECRET,
+    process.env.JWT_SECRET || 'development_secret_change_me',
     { expiresIn: '7d' }
   );
-};
+
+// Permanently remove account data after the recovery period.
+async function permanentlyDeleteAccount(user) {
+  const userId = user._id;
+
+  const ownedProjects = await Project.find({
+    owner: userId
+  }).select('_id');
+
+  const ownedProjectIds = ownedProjects.map(project => project._id);
+
+  // Delete tickets belonging to projects owned by this account.
+  await Ticket.deleteMany({
+    project: { $in: ownedProjectIds }
+  });
+
+  // Delete projects owned by this account.
+  await Project.deleteMany({
+    owner: userId
+  });
+
+  // Remove this account from other people's projects.
+  await Project.updateMany(
+    { teamMembers: userId },
+    { $pull: { teamMembers: userId } }
+  );
+
+  // Preserve shared tickets but remove references to this account.
+  await Ticket.updateMany(
+    { assignee: userId },
+    { $set: { assignee: null } }
+  );
+
+  await Ticket.updateMany(
+    { createdBy: userId },
+    { $set: { createdBy: null } }
+  );
+
+  await Ticket.updateMany(
+    { 'comments.user': userId },
+    { $set: { 'comments.$[comment].user': null } },
+    {
+      arrayFilters: [{ 'comment.user': userId }]
+    }
+  );
+
+  await User.deleteOne({ _id: userId });
+}
 
 // REGISTER
 router.post('/register', async (req, res, next) => {
@@ -64,23 +108,54 @@ router.post('/register', async (req, res, next) => {
   }
 });
 
-// LOGIN
+// LOGIN AND ACCOUNT RECOVERY
 router.post('/login', async (req, res, next) => {
   try {
     const email = req.body.email?.trim().toLowerCase();
-
     const user = await User.findOne({ email });
 
-    if (!user || !(await bcrypt.compare(req.body.password || '', user.password))) {
+    if (
+      !user ||
+      !(await bcrypt.compare(req.body.password || '', user.password))
+    ) {
       return res.status(401).json({
         message: 'Email or password is incorrect'
       });
     }
 
-    if (!user.isActive) {
-      return res.status(403).json({
-        message: 'Your account is deactivated. Contact support to reactivate it.'
+    if (user.deletedAt) {
+      const recoveryDeadline =
+        new Date(user.deletedAt).getTime() +
+        RECOVERY_DAYS * 24 * 60 * 60 * 1000;
+
+      if (Date.now() > recoveryDeadline) {
+        await permanentlyDeleteAccount(user);
+
+        return res.status(410).json({
+          message: 'The 30-day recovery period has expired. This account has been permanently deleted.'
+        });
+      }
+
+      // Restore account during the recovery period.
+      user.deletedAt = null;
+      user.isActive = true;
+      await user.save();
+
+      return res.json({
+        message: 'Your account has been successfully recovered.',
+        token: tokenFor(user.id),
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          isActive: true
+        }
       });
+    }
+
+    if (!user.isActive) {
+      user.isActive = true;
+      await user.save();
     }
 
     res.json({
@@ -98,7 +173,7 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// UPDATE PERSONAL INFORMATION
+// UPDATE PROFILE
 router.patch('/profile', auth, async (req, res, next) => {
   try {
     const { name } = req.body;
@@ -152,238 +227,43 @@ router.patch('/deactivate', auth, async (req, res, next) => {
   }
 });
 
-// CHANGE PASSWORD
-router.patch('/change-password', auth, async (req, res, next) => {
+// REQUEST ACCOUNT DELETION
+router.delete('/account', auth, async (req, res, next) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        message: 'Current password and new password are required'
-      });
-    }
-
-    if (newPassword.length < 8) {
-      return res.status(400).json({
-        message: 'New password must be at least 8 characters'
-      });
-    }
-
-    const user = await User.findById(req.user.id);
-
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
-    const matches = await bcrypt.compare(
-      currentPassword,
-      user.password
-    );
-
-    if (!matches) {
-      return res.status(401).json({
-        message: 'Current password is incorrect'
-      });
-    }
-
-    if (await bcrypt.compare(newPassword, user.password)) {
-      return res.status(400).json({
-        message: 'New password must be different from your current password'
-      });
-    }
-
-    user.password = await bcrypt.hash(newPassword, 12);
-    await user.save();
-
-    res.json({
-      message: 'Password changed successfully. Please log in again.'
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// GET PROJECTS OWNED BY CURRENT USER
-router.get('/owned-projects', auth, async (req, res, next) => {
-  try {
-    const projects = await Project.find({
-      owner: req.user.id
-    }).populate('teamMembers', 'name email');
-
-    res.json({ projects });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// PERMANENTLY DELETE ACCOUNT
-router.delete('/delete-account', auth, async (req, res, next) => {
-  try {
-    const { password, projectActions } = req.body;
+    const { password } = req.body;
 
     if (!password) {
       return res.status(400).json({
-        message: 'Your password is required'
-      });
-    }
-
-    if (!Array.isArray(projectActions)) {
-      return res.status(400).json({
-        message: 'Project deletion or transfer choices are required'
+        message: 'Please enter your password to confirm account deletion.'
       });
     }
 
     const user = await User.findById(req.user.id);
 
-    if (!user) {
-      return res.status(404).json({
-        message: 'User not found'
-      });
-    }
-
-    const passwordMatches = await bcrypt.compare(
-      password,
-      user.password
-    );
-
-    if (!passwordMatches) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({
-        message: 'Password is incorrect'
+        message: 'Incorrect password. Account was not deleted.'
       });
     }
 
-    const ownedProjects = await Project.find({
-      owner: user._id
-    });
-
-    // Every owned project must have exactly one valid action.
-    if (projectActions.length !== ownedProjects.length) {
-      return res.status(400).json({
-        message: 'Choose an action for every project you own'
-      });
-    }
-
-    const actionMap = new Map();
-
-    for (const action of projectActions) {
-      if (
-        !action ||
-        typeof action.projectId !== 'string' ||
-        actionMap.has(action.projectId)
-      ) {
-        return res.status(400).json({
-          message: 'Invalid or duplicate project action'
-        });
-      }
-
-      actionMap.set(action.projectId, action);
-    }
-
-    for (const project of ownedProjects) {
-      const action = actionMap.get(project._id.toString());
-
-      if (!action || !['delete', 'transfer'].includes(action.action)) {
-        return res.status(400).json({
-          message: 'Invalid action for an owned project'
-        });
-      }
-
-      if (action.action === 'transfer') {
-        if (!action.newOwner) {
-          return res.status(400).json({
-            message: 'Choose a new owner for each transferred project'
-          });
-        }
-
-        const isTeamMember = project.teamMembers.some(
-          member => member.toString() === action.newOwner
-        );
-
-        if (!isTeamMember || action.newOwner === user._id.toString()) {
-          return res.status(400).json({
-            message: 'New owner must be an existing team member'
-          });
-        }
-
-        const newOwnerExists = await User.exists({
-          _id: action.newOwner,
-          isActive: true
-        });
-
-        if (!newOwnerExists) {
-          return res.status(400).json({
-            message: 'Selected team member is not an active user'
-          });
-        }
-      }
-    }
-
-    // Process project choices.
-    for (const project of ownedProjects) {
-      const action = actionMap.get(project._id.toString());
-
-      if (action.action === 'delete') {
-        // Delete all tickets and comments belonging to this project.
-        await Ticket.deleteMany({
-          project: project._id
-        });
-
-        await Project.deleteOne({
-          _id: project._id
-        });
-      } else {
-        // Transfer ownership and remove the new owner from teamMembers.
-        await Project.updateOne(
-          { _id: project._id, owner: user._id },
-          {
-            $set: { owner: action.newOwner },
-            $pull: { teamMembers: action.newOwner }
-          }
-        );
-      }
-    }
-
-    // Remove this user from all other project team memberships.
-    await Project.updateMany(
-      { teamMembers: user._id },
-      { $pull: { teamMembers: user._id } }
-    );
-
-    // Unassign tickets assigned to this user.
-    await Ticket.updateMany(
-      { assignee: user._id },
-      { $set: { assignee: null } }
-    );
-
-    // Remove comments written by this user.
-    await Ticket.updateMany(
-      {},
-      { $pull: { comments: { user: user._id } } }
-    );
-
-    // Delete tickets created by this user that remain in other projects.
-    await Ticket.deleteMany({
-      createdBy: user._id
-    });
-
-    // Finally delete the account.
-    await User.deleteOne({
-      _id: user._id
-    });
+    user.deletedAt = new Date();
+    user.isActive = false;
+    await user.save();
 
     res.json({
-      message: 'Account and selected project data deleted successfully'
+      message: 'Account deletion scheduled. You have 30 days to recover your account by logging in again.',
+      recoveryDays: RECOVERY_DAYS
     });
   } catch (error) {
     next(error);
   }
 });
 
-// GET CURRENT LOGGED-IN USER
+// CURRENT USER
 router.get('/me', auth, (req, res) => {
-  res.json({ user: req.user });
+  res.json({
+    user: req.user
+  });
 });
 
 export default router;

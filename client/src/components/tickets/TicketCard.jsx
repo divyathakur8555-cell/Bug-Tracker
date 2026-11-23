@@ -1,11 +1,5 @@
+
 import { useState } from "react";
-import {
-  Pencil,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-  CircleDot,
-} from "lucide-react";
 
 export default function TicketCard({
   ticket,
@@ -15,74 +9,69 @@ export default function TicketCard({
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const priority = ticket.priority || "Low";
-  const status = ticket.status || "Todo";
+  const priority = (ticket.priority || "Low").toLowerCase();
+  const status = ticket.status || "Open";
+
+  const formattedStatus = status.replaceAll("_", " ");
 
   return (
-    <article className="modern-ticket-card">
-      <div className="modern-ticket-card-top">
-        <span className={`ticket-priority priority-${priority.toLowerCase()}`}>
-          {priority} Priority
+    <article className="ticket-card interactive-ticket-card">
+      <div className="ticket-card-top">
+        <span className={`badge ${priority}`}>
+          {priority.toUpperCase()} PRIORITY
         </span>
 
-        <span className={`modern-ticket-status status-${status.toLowerCase().replaceAll(" ", "-")}`}>
-          <CircleDot size={12} />
-          {status}
+        <span className={`ticket-status status-${status.toLowerCase().replaceAll(" ", "-")}`}>
+          {formattedStatus}
         </span>
       </div>
 
       <h3>{ticket.title || "Untitled ticket"}</h3>
 
-      <p className="modern-ticket-description">
+      <p className="muted ticket-description">
         {ticket.description || "No description provided."}
       </p>
 
-      <div className="modern-ticket-meta">
+      <div className="ticket-card-info">
         <span>
-          ID: {(ticket._id || ticket.id || "").slice(-6) || "N/A"}
+          <strong>Ticket ID:</strong>{" "}
+          {(ticket._id || ticket.id || "").slice(-6) || "N/A"}
         </span>
 
         <span>
-          {ticket.project?.name ||
-            ticket.projectName ||
-            "Project ticket"}
+          <strong>Priority:</strong> {ticket.priority || "Low"}
         </span>
       </div>
 
       {expanded && (
-        <div className="modern-ticket-expanded">
+        <div className="ticket-expanded-details">
           <p>
             <strong>Full description</strong>
           </p>
           <p>{ticket.description || "No description available."}</p>
 
           <p>
+            <strong>Project:</strong>{" "}
+            {ticket.project?.name || ticket.projectName || "Not specified"}
+          </p>
+
+          <p>
             <strong>Assignee:</strong>{" "}
-            {ticket.assignee?.name ||
-              ticket.assigneeName ||
-              "Unassigned"}
+            {ticket.assignee?.name || ticket.assigneeName || "Unassigned"}
           </p>
         </div>
       )}
 
       <button
         type="button"
-        className="modern-ticket-details-btn"
+        className="ticket-details-btn"
         onClick={() => setExpanded(!expanded)}
       >
-        {expanded ? (
-          <>
-            Show less <ChevronUp size={15} />
-          </>
-        ) : (
-          <>
-            View details <ChevronDown size={15} />
-          </>
-        )}
+        {expanded ? "Show less ↑" : "View details ↓"}
       </button>
 
       {onStatusChange && (
-        <div className="modern-ticket-status-control">
+        <div className="ticket-status-control">
           <label>Update status</label>
 
           <select
@@ -91,29 +80,28 @@ export default function TicketCard({
               onStatusChange(ticket, e.target.value)
             }
           >
-            <option value="Todo">Todo</option>
+            <option value="Open">Open</option>
             <option value="In Progress">In Progress</option>
-            <option value="Done">Done</option>
+            <option value="Resolved">Resolved</option>
+            <option value="Closed">Closed</option>
           </select>
         </div>
       )}
 
-      <div className="modern-ticket-actions">
+      <div className="ticket-card-actions">
         <button
           type="button"
-          className="ticket-edit-btn"
+          className="btn secondary"
           onClick={() => onEdit(ticket)}
         >
-          <Pencil size={15} />
           Edit
         </button>
 
         <button
           type="button"
-          className="ticket-delete-btn"
+          className="btn danger"
           onClick={() => onDelete(ticket)}
         >
-          <Trash2 size={15} />
           Delete
         </button>
       </div>

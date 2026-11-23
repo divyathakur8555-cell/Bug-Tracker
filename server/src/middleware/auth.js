@@ -25,7 +25,12 @@ export default async function auth(req, res, next) {
       });
     }
 
-    // Block deactivated accounts from protected routes
+    if (user.deletedAt) {
+      return res.status(403).json({
+        message: 'Account deletion is pending. Log in to recover your account.'
+      });
+    }
+
     if (!user.isActive) {
       return res.status(403).json({
         message: 'Your account is deactivated. Please log in again to reactivate it.'
@@ -34,7 +39,6 @@ export default async function auth(req, res, next) {
 
     req.user = user;
     next();
-
   } catch {
     return res.status(401).json({
       message: 'Invalid or expired token'

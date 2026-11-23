@@ -1,18 +1,7 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "../../context/AuthContext";
-import {
-  Bell,
-  ChevronDown,
-  UserRound,
-  Palette,
-  LogOut,
-  Settings,
-  Sun,
-  Moon,
-  Monitor,
-  Check,
-} from "lucide-react";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -31,11 +20,11 @@ export default function Navbar() {
   const changeTheme = (newTheme) => {
     localStorage.setItem("trackwise_theme", newTheme);
     setTheme(newTheme);
+
     window.dispatchEvent(new Event("trackwise-theme-change"));
   };
 
   const handleLogout = () => {
-    setProfileOpen(false);
     logout();
     navigate("/login");
   };
@@ -44,74 +33,57 @@ export default function Navbar() {
     <header className="topbar">
       <div className="topbar-brand">
         <span className="breadcrumb">Workspace</span>
-        <span className="breadcrumb-divider">/</span>
-        <strong>Overview</strong>
+        <span className="breadcrumb-divider"> / </span>
+        <strong>Trackwise</strong>
       </div>
 
       <div className="topbar-actions">
         {!loading && (
           <>
+            {/* Notifications */}
             <div className="navbar-dropdown">
               <button
                 className="icon-button notification-button"
                 title="Notifications"
-                aria-label="Notifications"
                 onClick={() => {
                   setNotificationsOpen(!notificationsOpen);
                   setProfileOpen(false);
                 }}
               >
-                <Bell size={19} />
+                🔔
               </button>
 
               {notificationsOpen && (
                 <div className="navbar-popup notification-popup">
                   <h3>Notifications</h3>
-                  <div className="notification-empty">
-                    <span className="notification-empty-icon">
-                      <Bell size={22} />
-                    </span>
-                    <strong>You're all caught up!</strong>
-                    <p className="muted">
-                      No new notifications right now.
-                    </p>
-                  </div>
+                  <p className="muted">You're all caught up! 🎉</p>
                 </div>
               )}
             </div>
 
+            {/* Profile */}
             {user ? (
               <div className="navbar-dropdown">
                 <button
-                  className={`profile-trigger ${
-                    profileOpen ? "active" : ""
-                  }`}
+                  className={`profile-trigger ${profileOpen ? "active" : ""}`}
                   onClick={() => {
                     setProfileOpen(!profileOpen);
                     setNotificationsOpen(false);
                   }}
                 >
-                  <span className="profile-avatar">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-
+                  <span className="profile-avatar">😊</span>
                   <span className="profile-trigger-name">
                     {displayName}
                   </span>
-
-                  <ChevronDown
-                    size={16}
-                    className="profile-arrow"
-                  />
+                  <span className="profile-arrow">
+                    {profileOpen ? "▲" : "▼"}
+                  </span>
                 </button>
 
                 {profileOpen && (
                   <div className="navbar-popup profile-popup">
                     <div className="profile-popup-header">
-                      <span className="profile-avatar large">
-                        {displayName.charAt(0).toUpperCase()}
-                      </span>
-
+                      <span className="profile-avatar large">😊</span>
                       <div>
                         <strong>{displayName}</strong>
                         <p className="muted">{user.email}</p>
@@ -126,52 +98,23 @@ export default function Navbar() {
                         navigate("/profile");
                       }}
                     >
-                      <UserRound size={17} />
-                      My Profile
+                      👤 My Profile
                     </button>
 
                     <div className="appearance-section">
-                      <div className="appearance-title">
-                        <Palette size={17} />
-                        <strong>Appearance</strong>
-                      </div>
+                      <strong>🎨 Appearance</strong>
 
                       <p className="muted">Choose your theme</p>
 
-                      <div className="theme-options">
-                        <button
-                          className={
-                            theme === "light" ? "selected" : ""
-                          }
-                          onClick={() => changeTheme("light")}
-                        >
-                          <Sun size={16} />
-                          Light
-                          {theme === "light" && <Check size={15} />}
-                        </button>
-
-                        <button
-                          className={
-                            theme === "dark" ? "selected" : ""
-                          }
-                          onClick={() => changeTheme("dark")}
-                        >
-                          <Moon size={16} />
-                          Dark
-                          {theme === "dark" && <Check size={15} />}
-                        </button>
-
-                        <button
-                          className={
-                            theme === "system" ? "selected" : ""
-                          }
-                          onClick={() => changeTheme("system")}
-                        >
-                          <Monitor size={16} />
-                          System
-                          {theme === "system" && <Check size={15} />}
-                        </button>
-                      </div>
+                      <select
+                        value={theme}
+                        onChange={(e) => changeTheme(e.target.value)}
+                        className="theme-select"
+                      >
+                        <option value="light">☀️ Light</option>
+                        <option value="dark">🌙 Dark</option>
+                        <option value="system">💻 System default</option>
+                      </select>
                     </div>
 
                     <button
@@ -180,8 +123,7 @@ export default function Navbar() {
                         navigate("/profile");
                       }}
                     >
-                      <Settings size={17} />
-                      Account Settings
+                      ⚙️ Account Settings
                     </button>
 
                     <div className="popup-divider" />
@@ -190,8 +132,7 @@ export default function Navbar() {
                       className="popup-logout"
                       onClick={handleLogout}
                     >
-                      <LogOut size={17} />
-                      Log out
+                      🚪 Log out
                     </button>
                   </div>
                 )}

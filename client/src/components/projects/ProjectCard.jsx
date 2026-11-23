@@ -1,89 +1,81 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  FolderKanban,
-  ArrowUpRight,
-  Trash2
-} from "lucide-react";
-
 import { useProjects } from "../../context/ProjectContext";
+import { useAuthContext } from "../../context/AuthContext";
 
 export default function ProjectCard({ project }) {
   const id = project._id || project.id;
 
-  const { deleteProject } = useProjects();
+  const { removeProject } = useProjects();
+  const { user } = useAuthContext();
 
   const [deleting, setDeleting] = useState(false);
-  const [error, setError] = useState("");
+
+  const ownerId =
+    project.owner?._id ||
+    project.owner?.id ||
+    project.owner;
+
+  const userId = user?._id || user?.id;
 
   const isOwner =
-    project.owner?._id === project.owner?.toString() ||
-    project.owner === project.owner?._id;
+    ownerId && userId &&
+    String(ownerId) === String(userId);
 
   const handleDelete = async () => {
     const confirmed = window.confirm(
-      `Are you sure you want to permanently delete "${project.name || project.title}"?\n\nAll tickets belonging to this project will also be deleted. This action cannot be undone.`
+      `Are you sure you want to delete "${project.name || project.title}"? All tickets in this project will also be deleted.`
     );
 
     if (!confirmed) return;
 
     try {
       setDeleting(true);
-      setError("");
-
-      await deleteProject(id);
-    } catch (err) {
-      setError(
-        err.message || "Could not delete this project. Please try again."
+      await removeProject(id);
+    } catch (error) {
+      window.alert(
+        error.message || "Unable to delete project."
       );
+    } finally {
       setDeleting(false);
     }
   };
 
   return (
-    <div className="project-modern-card">
-      <div className="project-card-top">
-        <div className="project-card-icon">
-          <FolderKanban size={22} />
-        </div>
-
-        <span className="project-card-label">
-          PROJECT
-        </span>
-      </div>
+    <div className="card project-card">
+      <div className="project-card-icon">▦</div>
 
       <h3>{project.name || project.title}</h3>
 
-      <p className="project-card-description">
-        {project.description || "No description added yet."}
+      <p className="project-description">
+        {project.description || "No description provided."}
       </p>
-
-      {error && (
-        <p className="project-delete-error">
-          {error}
-        </p>
-      )}
 
       <div className="project-card-footer">
         <Link
+          className="btn secondary"
           to={`/projects/${id}`}
-          className="project-open-link"
         >
-          View project details
-          <ArrowUpRight size={18} />
+          Open Project
         </Link>
 
-        <button
-          type="button"
-          className="project-delete-btn"
-          onClick={handleDelete}
-          disabled={deleting}
-          title="Delete project"
-        >
-          <Trash2 size={16} />
-          {deleting ? "Deleting..." : "Delete"}
-        </button>
+        {isOwner && (
+          <button
+            type="button"
+            className="btn"
+            onClick={handleDelete}
+            disabled={deleting}
+            style={{
+              background: "#dc2626",
+              color: "#ffffff",
+              border: "none",
+              cursor: deleting ? "not-allowed" : "pointer"
+            }}
+          >
+            {deleting ? "Deleting..." : "Delete Project"}
+          </button>
+        )}
       </div>
     </div>
   );
