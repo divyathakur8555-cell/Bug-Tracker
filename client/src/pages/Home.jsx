@@ -129,7 +129,7 @@ export default function Home() {
                   <div className="tw-preview-heading">
                     <div>
                       <small>WORKSPACE / OVERVIEW</small>
-                      <h3>Good morning, Jordan</h3>
+                      <h3>Good morning, Divya Thakur</h3>
                       <p>Here's what's happening with your projects.</p>
                     </div>
                     <span className="tw-preview-date">This week</span>
