@@ -1,12 +1,14 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import useAuth from "../hooks/useAuth";
 
 export default function Profile() {
   const { user, logout } = useAuth();
 
   const [name, setName] = useState(user?.name || "");
-  const [theme, setTheme] = useState("Light");
+  const [theme, setTheme] = useState(
+    localStorage.getItem("trackwise_theme") || "system"
+  );
   const [notifications, setNotifications] = useState(true);
 
   const [saving, setSaving] = useState(false);
@@ -16,13 +18,34 @@ export default function Profile() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  // Security states
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
+
+  // Keep appearance synchronized with Navbar
+  useEffect(() => {
+    const syncTheme = () => {
+      setTheme(localStorage.getItem("trackwise_theme") || "system");
+    };
+
+    window.addEventListener("trackwise-theme-change", syncTheme);
+
+    return () => {
+      window.removeEventListener("trackwise-theme-change", syncTheme);
+    };
+  }, []);
+
+  const handleThemeChange = (e) => {
+    const newTheme = e.target.value;
+
+    localStorage.setItem("trackwise_theme", newTheme);
+    setTheme(newTheme);
+
+    window.dispatchEvent(new Event("trackwise-theme-change"));
+  };
 
   // UPDATE PROFILE
   const handleSave = async (e) => {
@@ -68,9 +91,7 @@ export default function Profile() {
     setPasswordError("");
 
     if (newPassword.length < 8) {
-      setPasswordError(
-        "New password must contain at least 8 characters."
-      );
+      setPasswordError("New password must contain at least 8 characters.");
       return;
     }
 
@@ -103,13 +124,10 @@ export default function Profile() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Password change failed."
-        );
+        throw new Error(data.message || "Password change failed.");
       }
 
       setPasswordMessage(data.message);
-
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -122,11 +140,7 @@ export default function Profile() {
 
   // DEACTIVATE ACCOUNT
   const handleDeactivate = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to deactivate your account?"
-      )
-    ) {
+    if (!window.confirm("Are you sure you want to deactivate your account?")) {
       return;
     }
 
@@ -184,22 +198,17 @@ export default function Profile() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            password: deletePassword,
-          }),
+          body: JSON.stringify({ password: deletePassword }),
         }
       );
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Account deletion failed."
-        );
+        throw new Error(data.message || "Account deletion failed.");
       }
 
       alert(data.message);
-
       logout();
       window.location.href = "/login";
     } catch (err) {
@@ -213,15 +222,9 @@ export default function Profile() {
     <div className="settings-page">
       <div className="settings-header">
         <div>
-          <span className="settings-eyebrow">
-            ACCOUNT MANAGEMENT
-          </span>
-
+          <span className="settings-eyebrow">ACCOUNT MANAGEMENT</span>
           <h1>Profile Settings</h1>
-
-          <p>
-            Manage your personal information and preferences.
-          </p>
+          <p>Manage your personal information and preferences.</p>
         </div>
 
         <div className="profile-status">
@@ -230,7 +233,6 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* PROFILE BANNER */}
       <div className="settings-profile-banner">
         <div className="settings-avatar">
           {name.charAt(0).toUpperCase() || "U"}
@@ -243,12 +245,10 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* PERSONAL INFORMATION */}
       <form onSubmit={handleSave}>
         <section className="settings-section">
           <div className="settings-section-heading">
             <div className="settings-icon">♙</div>
-
             <div>
               <h2>Personal Information</h2>
               <p>Update your basic account details.</p>
@@ -258,7 +258,6 @@ export default function Profile() {
           <div className="settings-form-grid">
             <div className="settings-field">
               <label>Full Name</label>
-
               <input
                 type="text"
                 value={name}
@@ -270,42 +269,24 @@ export default function Profile() {
 
             <div className="settings-field">
               <label>Email Address</label>
-
-              <input
-                type="email"
-                value={user?.email || ""}
-                disabled
-              />
-
-              
+              <input type="email" value={user?.email || ""} disabled />
             </div>
           </div>
 
           <div className="settings-save-row">
-            <button
-              type="submit"
-              className="settings-primary-btn"
-              disabled={saving}
-            >
+            <button type="submit" className="settings-primary-btn" disabled={saving}>
               {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
 
-          {message && (
-            <p className="settings-message">{message}</p>
-          )}
-
-          {error && (
-            <p className="settings-error">{error}</p>
-          )}
+          {message && <p className="settings-message">{message}</p>}
+          {error && <p className="settings-error">{error}</p>}
         </section>
       </form>
 
-      {/* PERSONALIZATION */}
       <section className="settings-section">
         <div className="settings-section-heading">
           <div className="settings-icon">⚙</div>
-
           <div>
             <h2>Personalization</h2>
             <p>Customize your Trackwise experience.</p>
@@ -318,65 +299,47 @@ export default function Profile() {
             <p>Choose your preferred application theme.</p>
           </div>
 
-          <select
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-          >
-            <option>Light</option>
-            <option>Dark</option>
-            <option>System Default</option>
+          <select value={theme} onChange={handleThemeChange}>
+            <option value="light">☀️ Light</option>
+            <option value="dark">🌙 Dark</option>
+            <option value="system">💻 System Default</option>
           </select>
         </div>
 
         <div className="settings-option">
           <div>
             <strong>Email Notifications</strong>
-            <p>
-              Receive updates about projects and tickets.
-            </p>
+            <p>Receive updates about projects and tickets.</p>
           </div>
 
           <label className="settings-switch">
             <input
               type="checkbox"
               checked={notifications}
-              onChange={(e) =>
-                setNotifications(e.target.checked)
-              }
+              onChange={(e) => setNotifications(e.target.checked)}
             />
-
             <span></span>
           </label>
         </div>
       </section>
 
-      {/* SECURITY */}
       <section className="settings-section">
         <div className="settings-section-heading">
           <div className="settings-icon">♢</div>
-
           <div>
             <h2>Security</h2>
             <p>Keep your account protected.</p>
           </div>
         </div>
 
-        <form
-          onSubmit={handleChangePassword}
-          className="settings-password-form"
-        >
+        <form onSubmit={handleChangePassword} className="settings-password-form">
           <div className="settings-field">
-            <label htmlFor="current-password">
-              Current Password
-            </label>
-
+            <label htmlFor="current-password">Current Password</label>
             <input
               id="current-password"
               type="password"
               value={currentPassword}
-              onChange={(e) =>
-                setCurrentPassword(e.target.value)
-              }
+              onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="Enter current password"
               autoComplete="current-password"
               required
@@ -384,17 +347,12 @@ export default function Profile() {
           </div>
 
           <div className="settings-field">
-            <label htmlFor="new-password">
-              New Password
-            </label>
-
+            <label htmlFor="new-password">New Password</label>
             <input
               id="new-password"
               type="password"
               value={newPassword}
-              onChange={(e) =>
-                setNewPassword(e.target.value)
-              }
+              onChange={(e) => setNewPassword(e.target.value)}
               placeholder="Minimum 8 characters"
               autoComplete="new-password"
               minLength={8}
@@ -403,17 +361,12 @@ export default function Profile() {
           </div>
 
           <div className="settings-field">
-            <label htmlFor="confirm-password">
-              Confirm New Password
-            </label>
-
+            <label htmlFor="confirm-password">Confirm New Password</label>
             <input
               id="confirm-password"
               type="password"
               value={confirmPassword}
-              onChange={(e) =>
-                setConfirmPassword(e.target.value)
-              }
+              onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Enter new password again"
               autoComplete="new-password"
               minLength={8}
@@ -421,100 +374,57 @@ export default function Profile() {
             />
           </div>
 
-          {passwordError && (
-            <p className="settings-error" role="alert">
-              {passwordError}
-            </p>
-          )}
+          {passwordError && <p className="settings-error" role="alert">{passwordError}</p>}
+          {passwordMessage && <p className="settings-message" role="status">{passwordMessage}</p>}
 
-          {passwordMessage && (
-            <p className="settings-message" role="status">
-              {passwordMessage}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            className="settings-primary-btn"
-            disabled={changingPassword}
-          >
-            {changingPassword
-              ? "Updating..."
-              : "Update Password"}
+          <button type="submit" className="settings-primary-btn" disabled={changingPassword}>
+            {changingPassword ? "Updating..." : "Update Password"}
           </button>
         </form>
       </section>
 
-      {/* ACCOUNT MANAGEMENT */}
       <section className="settings-section settings-danger">
         <div className="settings-section-heading">
           <div className="settings-icon danger-icon">!</div>
-
           <div>
             <h2>Account Management</h2>
             <p>Manage the status of your account.</p>
           </div>
         </div>
 
-        {/* DEACTIVATE */}
         <div className="settings-option">
           <div>
             <strong>Deactivate Account</strong>
-
-            <p>
-              Temporarily disable your account.
-              Your projects and tickets will remain saved.
-            </p>
+            <p>Temporarily disable your account. Your projects and tickets will remain saved.</p>
           </div>
 
-          <button
-            type="button"
-            className="settings-danger-btn"
-            onClick={handleDeactivate}
-          >
+          <button type="button" className="settings-danger-btn" onClick={handleDeactivate}>
             Deactivate Account
           </button>
         </div>
 
-        {/* DELETE */}
         <div className="settings-option">
           <div>
             <strong>Delete Account Permanently</strong>
-
-            <p>
-              Schedule your account for permanent deletion.
-              You have 30 days to recover it by logging in again.
-            </p>
+            <p>Schedule your account for permanent deletion. You have 30 days to recover it by logging in again.</p>
           </div>
         </div>
 
-        <form
-          onSubmit={handleDeleteAccount}
-          className="settings-password-form"
-        >
+        <form onSubmit={handleDeleteAccount} className="settings-password-form">
           <div className="settings-field">
-            <label htmlFor="delete-account-password">
-              Confirm your current password
-            </label>
-
+            <label htmlFor="delete-account-password">Confirm your current password</label>
             <input
               id="delete-account-password"
               type="password"
               value={deletePassword}
-              onChange={(e) =>
-                setDeletePassword(e.target.value)
-              }
+              onChange={(e) => setDeletePassword(e.target.value)}
               placeholder="Enter your current password"
               autoComplete="current-password"
               required
             />
           </div>
 
-          <button
-            type="submit"
-            className="settings-danger-btn"
-            disabled={deleting}
-          >
+          <button type="submit" className="settings-danger-btn" disabled={deleting}>
             {deleting ? "Processing..." : "Delete Account"}
           </button>
         </form>
