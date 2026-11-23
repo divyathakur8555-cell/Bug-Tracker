@@ -1,1 +1,72 @@
-import {useState} from "react";export default function ProjectForm({onSubmit,onCancel}){const[form,setForm]=useState({name:"",description:""}),[error,setError]=useState("");const submit=async e=>{e.preventDefault();try{await onSubmit(form);}catch(x){setError(x.response?.data?.message||"Could not save project");}};return <form className="form" onSubmit={submit}><label>Project name<input required value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><label>Description<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})}/></label>{error&&<p className="error">{error}</p>}<button className="btn">Create project</button> <button type="button" className="btn secondary" onClick={onCancel}>Cancel</button></form>}
+
+import { useState } from "react";
+
+export default function ProjectForm({ onSubmit, onCancel }) {
+  const [form, setForm] = useState({
+    title: "",
+    description: ""
+  });
+
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSubmitting(true);
+
+    try {
+      await onSubmit({
+        title: form.title.trim(),
+        description: form.description.trim()
+      });
+    } catch (err) {
+      setError(err.message || "Could not save project");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form className="form" onSubmit={submit}>
+      <label>
+        Project name
+        <input
+          type="text"
+          required
+          value={form.title}
+          onChange={(e) =>
+            setForm({ ...form, title: e.target.value })
+          }
+          placeholder="Enter project name"
+        />
+      </label>
+
+      <label>
+        Description
+        <textarea
+          value={form.description}
+          onChange={(e) =>
+            setForm({ ...form, description: e.target.value })
+          }
+          placeholder="Describe your project"
+        />
+      </label>
+
+      {error && <p className="error">{error}</p>}
+
+      <button className="btn" type="submit" disabled={submitting}>
+        {submitting ? "Creating..." : "Create project"}
+      </button>
+
+      <button
+        type="button"
+        className="btn secondary"
+        onClick={onCancel}
+        disabled={submitting}
+      >
+        Cancel
+      </button>
+    </form>
+  );
+}

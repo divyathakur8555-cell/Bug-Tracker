@@ -1,9 +1,6 @@
 
 import { useState } from "react";
-import {
-  PRIORITIES,
-  TICKET_STATUSES
-} from "../../utils/constants";
+import { PRIORITIES, TICKET_STATUSES } from "../../utils/constants";
 
 export default function TicketForm({
   initial = {},
@@ -18,6 +15,7 @@ export default function TicketForm({
     status: initial.status || "Todo",
     projectId:
       initial.project?._id ||
+      initial.projectId ||
       initial.project ||
       projects[0]?._id ||
       projects[0]?.id ||
@@ -25,30 +23,36 @@ export default function TicketForm({
   });
 
   const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
-  const change = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setForm((previous) => ({
+      ...previous,
+      [name]: value
+    }));
   };
 
   const submit = async (e) => {
     e.preventDefault();
     setError("");
 
-    if (!form.projectId) {
-      setError("Please select a project first.");
-      return;
-    }
+    const selectedProjectId = String(form.projectId || "").trim();
+
+    console.log("Selected project ID:", selectedProjectId);
+    console.log("Available projects:", projects);
 
     if (!form.title.trim()) {
       setError("Please enter a ticket title.");
       return;
     }
 
-    setSaving(true);
+    if (!selectedProjectId) {
+      setError("Please select a project before creating a ticket.");
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       await onSubmit({
@@ -56,25 +60,27 @@ export default function TicketForm({
         description: form.description.trim(),
         priority: form.priority,
         status: form.status,
-        projectId: form.projectId
+        project: selectedProjectId,
+        projectId: selectedProjectId
       });
     } catch (err) {
+      console.error("CREATE TICKET ERROR:", err);
       setError(err.message || "Could not save ticket.");
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
   return (
     <form className="form" onSubmit={submit}>
       <label>
-        Title
+        Ticket title
         <input
+          type="text"
           name="title"
           value={form.title}
-          onChange={change}
+          onChange={handleChange}
           placeholder="Enter ticket title"
-          maxLength={150}
           required
         />
       </label>
@@ -84,7 +90,7 @@ export default function TicketForm({
         <textarea
           name="description"
           value={form.description}
-          onChange={change}
+          onChange={handleChange}
           placeholder="Describe the issue"
         />
       </label>
@@ -94,11 +100,10 @@ export default function TicketForm({
         <select
           name="projectId"
           value={form.projectId}
-          onChange={change}
+          onChange={handleChange}
           required
         >
-          <option value="">Select project</option>
-
+          <option value="">Select a project</option>
           {projects.map((project) => (
             <option
               key={project._id || project.id}
@@ -115,11 +120,11 @@ export default function TicketForm({
         <select
           name="priority"
           value={form.priority}
-          onChange={change}
+          onChange={handleChange}
         >
-          {PRIORITIES.map((priority) => (
-            <option key={priority} value={priority}>
-              {priority}
+          {(PRIORITIES || ["Low", "Medium", "High"]).map((item) => (
+            <option key={item} value={item}>
+              {item}
             </option>
           ))}
         </select>
@@ -130,43 +135,30 @@ export default function TicketForm({
         <select
           name="status"
           value={form.status}
-          onChange={change}
+          onChange={handleChange}
         >
-          {TICKET_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {status}
+          {(TICKET_STATUSES || ["Todo", "In Progress", "Done"]).map((item) => (
+            <option key={item} value={item}>
+              {item}
             </option>
           ))}
         </select>
       </label>
 
-      {error && (
-        <p className="error" role="alert">
-          {error}
-        </p>
-      )}
+      {error && <p className="error">{error}</p>}
 
-      <button
-        className="btn"
-        type="submit"
-        disabled={saving || projects.length === 0}
-      >
-        {saving ? "Saving..." : "Save ticket"}
+      <button className="btn" type="submit" disabled={submitting}>
+        {submitting ? "Saving..." : "Save ticket"}
       </button>
 
       <button
-        type="button"
         className="btn secondary"
+        type="button"
         onClick={onCancel}
+        disabled={submitting}
       >
         Cancel
       </button>
-
-      {projects.length === 0 && (
-        <p className="error">
-          Create a project before creating a ticket.
-        </p>
-      )}
     </form>
   );
 }

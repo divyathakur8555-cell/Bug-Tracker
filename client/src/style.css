@@ -2608,3 +2608,39 @@ html[data-theme="dark"] .card.empty {
   color: #16a34a;
   font-size: 13px;
 }
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrapper input {
+  width: 100%;
+  padding-right: 65px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font-weight: 600;
+  padding: 5px;
+}
+
+.btn.danger {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.btn.danger:hover {
+  background: #b91c1c;
+}

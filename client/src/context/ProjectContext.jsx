@@ -33,21 +33,38 @@ export function ProjectProvider({ children }) {
     setLoading(true);
 
     try {
-      const d = await getProjects();
-      setProjects(d.projects || d.data || d || []);
+      const data = await getProjects();
+      const list = Array.isArray(data)
+        ? data
+        : data.projects || data.data || [];
+
+      setProjects(list);
+      return list;
+    } catch (error) {
+      console.error("FETCH PROJECTS ERROR:", error);
+      throw error;
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    refreshProjects().catch(() => {});
+    if (user) {
+      refreshProjects().catch(console.error);
+    } else {
+      setProjects([]);
+    }
   }, [user]);
 
   const addProject = async (formData) => {
-    const d = await createProject(formData);
-    await refreshProjects();
-    return d;
+    try {
+      const result = await createProject(formData);
+      await refreshProjects();
+      return result;
+    } catch (error) {
+      console.error("CREATE PROJECT ERROR:", error);
+      throw error;
+    }
   };
 
   const removeProject = async (id) => {

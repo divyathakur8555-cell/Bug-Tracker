@@ -1,1 +1,84 @@
-import {createContext,useContext,useEffect,useState} from "react"; import {getCurrentUser,loginUser,registerUser} from "../services/authService"; const C=createContext(null); export const useAuthContext=()=>useContext(C); export function AuthProvider({children}){const[user,setUser]=useState(null),[loading,setLoading]=useState(true);useEffect(()=>{if(!localStorage.getItem("trackwise_token")){setLoading(false);return;}getCurrentUser().then(d=>setUser(d.user||d)).catch(()=>localStorage.removeItem("trackwise_token")).finally(()=>setLoading(false));},[]);const save=d=>{const t=d.token||d.data?.token;if(t)localStorage.setItem("trackwise_token",t);setUser(d.user||d.data?.user||null);};const login=async f=>{const d=await loginUser(f);save(d);return d;};const register=async f=>{const d=await registerUser(f);save(d);return d;};const logout=()=>{localStorage.removeItem("trackwise_token");setUser(null);};return <C.Provider value={{user,loading,login,register,logout}}>{children}</C.Provider>}
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState
+} from "react";
+
+import {
+  getCurrentUser,
+  loginUser,
+  registerUser
+} from "../services/authService";
+
+const C = createContext(null);
+
+export const useAuthContext = () => useContext(C);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("trackwise_token");
+
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    getCurrentUser()
+      .then((data) => {
+        setUser(data.user || data);
+      })
+      .catch(() => {
+        localStorage.removeItem("trackwise_token");
+        setUser(null);
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = (data) => {
+    const token = data.token || data.data?.token;
+    const loggedInUser = data.user || data.data?.user;
+
+    if (!token || !loggedInUser) {
+      throw new Error("Authentication response is incomplete.");
+    }
+
+    localStorage.setItem("trackwise_token", token);
+    setUser(loggedInUser);
+  };
+
+  const login = async (formData) => {
+    const data = await loginUser(formData);
+    save(data);
+    return data;
+  };
+
+  const register = async (formData) => {
+    const data = await registerUser(formData);
+    save(data);
+    return data;
+  };
+
+  const logout = () => {
+    localStorage.removeItem("trackwise_token");
+    setUser(null);
+  };
+
+  return (
+    <C.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout
+      }}
+    >
+      {children}
+    </C.Provider>
+  );
+}
