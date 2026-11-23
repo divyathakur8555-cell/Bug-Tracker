@@ -38,8 +38,12 @@ export default async function auth(req, res, next) {
     }
 
     req.user = user;
+    req.userId = user._id.toString();
+
     next();
-  } catch {
+  } catch (error) {
+    console.error('AUTH ERROR:', error.message);
+
     return res.status(401).json({
       message: 'Invalid or expired token'
     });

@@ -10,12 +10,13 @@ const router = Router();
 
 router.use(auth);
 
+// Get all projects
 router.get('/', async (req, res, next) => {
   try {
     const projects = await Project.find({
       $or: [
-        { owner: req.user.id },
-        { teamMembers: req.user.id }
+        { owner: req.userId },
+        { teamMembers: req.userId }
       ]
     })
       .populate('owner', 'name email')
@@ -23,34 +24,46 @@ router.get('/', async (req, res, next) => {
       .sort('-updatedAt');
 
     res.json(projects);
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
+// Create project
 router.post('/', async (req, res, next) => {
   try {
-    if (!req.body.title?.trim()) {
+    const title = req.body?.title?.trim();
+    const description = req.body?.description?.trim() || '';
+
+    if (!title) {
       return res.status(400).json({
         message: 'Project title is required'
       });
     }
 
+    if (!mongoose.isValidObjectId(req.userId)) {
+      return res.status(401).json({
+        message: 'Invalid user authentication'
+      });
+    }
+
     const project = await Project.create({
-      title: req.body.title,
-      description: req.body.description || '',
-      owner: req.user.id,
-      teamMembers: [req.user.id]
+      title,
+      description,
+      owner: req.userId,
+      teamMembers: [req.userId]
     });
 
-    res.status(201).json(
-      await project.populate('teamMembers', 'name email')
-    );
-  } catch (e) {
-    next(e);
+    await project.populate('owner teamMembers', 'name email');
+
+    return res.status(201).json(project);
+  } catch (error) {
+    console.error('PROJECT CREATION ERROR:', error);
+    next(error);
   }
 });
 
+// Get one project
 router.get('/:id', async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
@@ -62,8 +75,8 @@ router.get('/:id', async (req, res, next) => {
     const project = await Project.findOne({
       _id: req.params.id,
       $or: [
-        { owner: req.user.id },
-        { teamMembers: req.user.id }
+        { owner: req.userId },
+        { teamMembers: req.userId }
       ]
     })
       .populate('owner', 'name email')
@@ -76,16 +89,17 @@ router.get('/:id', async (req, res, next) => {
     }
 
     res.json(project);
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
+// Update project
 router.patch('/:id', async (req, res, next) => {
   try {
     const project = await Project.findOne({
       _id: req.params.id,
-      owner: req.user.id
+      owner: req.userId
     });
 
     if (!project) {
@@ -105,16 +119,17 @@ router.patch('/:id', async (req, res, next) => {
     await project.save();
 
     res.json(project);
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
+// Add project member
 router.post('/:id/members', async (req, res, next) => {
   try {
     const project = await Project.findOne({
       _id: req.params.id,
-      owner: req.user.id
+      owner: req.userId
     });
 
     if (!project) {
@@ -142,13 +157,12 @@ router.post('/:id/members', async (req, res, next) => {
     res.json(
       await project.populate('teamMembers', 'name email')
     );
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
-// Delete a project and all its tickets.
-// Only the project owner can perform this action.
+// Delete project and its tickets
 router.delete('/:id', async (req, res, next) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
@@ -159,7 +173,7 @@ router.delete('/:id', async (req, res, next) => {
 
     const project = await Project.findOne({
       _id: req.params.id,
-      owner: req.user.id
+      owner: req.userId
     });
 
     if (!project) {
@@ -177,8 +191,8 @@ router.delete('/:id', async (req, res, next) => {
     res.json({
       message: 'Project and its tickets deleted successfully'
     });
-  } catch (e) {
-    next(e);
+  } catch (error) {
+    next(error);
   }
 });
 
